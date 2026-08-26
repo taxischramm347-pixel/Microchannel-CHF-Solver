@@ -4,8 +4,18 @@ import numpy as np
 # STALWART Reality Engine: Microchannel CHF Solver
 st.set_page_config(page_title="STALWART CHF Solver", page_icon="maltedlogo.ico", layout="wide")
 
-st.sidebar.markdown("## 📷 OPTICAL INPUT")
-camera_photo = st.sidebar.camera_input("Capture Hardware / Schematics")
+st.sidebar.markdown("## 📷 OPTICAL INPUT (BYOK)")
+enable_camera = st.sidebar.toggle("Enable Optical Sensor")
+camera_photo = None
+
+if enable_camera:
+    camera_photo = st.sidebar.camera_input("Capture Hardware / Schematics")
+
+user_api_key = st.sidebar.text_input(
+    "Google Gemini API Key (BYOK)", 
+    type="password", 
+    help="Bring Your Own Key: Enter your personal API key to parse optical sketches via Vision AI. You cover your own compute costs."
+)
 
 st.sidebar.markdown("## 1. THERMAL LOAD DYNAMICS")
 power_density = st.sidebar.number_input("Heat Load (W/cm²)", value=1200.0, step=50.0)
@@ -53,7 +63,10 @@ st.markdown("### THREAT LEVEL: ZERO. MATH IS TRUTH.")
 st.markdown("#### ACTIVE TELEMETRY: 2D FINITE-DIFFERENCE THERMAL-SCALAR SOLVER")
 
 if camera_photo:
-    st.success("✅ Optical data captured and stored in local memory cache.")
+    if user_api_key:
+        st.success("✅ Optical data captured. API Key recognized. (Vision Parsing Module standing by for integration).")
+    else:
+        st.warning("⚠️ Optical data captured, but no API Key detected. Please enter your BYOK to enable Vision Parsing.")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("INPUT HEAT LOAD", f"{power_density} W/cm²")
