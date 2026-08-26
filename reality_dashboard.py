@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 
 # STALWART Reality Engine: Microchannel CHF Solver
-st.set_page_config(page_title="STALWART CHF Solver", layout="wide")
+st.set_page_config(page_title="STALWART CHF Solver", page_icon="maltedlogo.ico", layout="wide")
 
 st.sidebar.markdown("## 1. THERMAL LOAD DYNAMICS")
 power_density = st.sidebar.number_input("Heat Load (W/cm²)", value=1200.0, step=50.0)
@@ -15,18 +15,27 @@ fin_pitch = st.sidebar.number_input("Fin Pitch (μm)", value=100.0, step=10.0)
 
 st.sidebar.markdown("## 3. FLUID & MATERIAL PARAMS")
 velocity = st.sidebar.number_input("Initial Coolant Velocity (m/s)", value=2.0, step=0.5)
-material = st.sidebar.selectbox("Substrate Material", ["Silicon", "Copper", "Diamond", "Hafnium Oxide"])
 
-# Material property dictionaries (Melt Temp K, Thermal Conductivity W/mK)
-materials = {
-    "Silicon": {"melt": 1687.0, "k": 149.0},
-    "Copper": {"melt": 1358.0, "k": 401.0},
-    "Diamond": {"melt": 4300.0, "k": 2200.0},
-    "Hafnium Oxide": {"melt": 3031.0, "k": 23.0}
-}
+# Dynamic Material Selection with Theoretical Input
+material = st.sidebar.selectbox(
+    "Substrate Material", 
+    ["Silicon", "Copper", "Diamond", "Hafnium Oxide", "Custom (Theoretical)"]
+)
 
-mat_limit = materials[material]["melt"]
-k_mat = materials[material]["k"]
+if material == "Custom (Theoretical)":
+    st.sidebar.markdown("### 🧪 THEORETICAL MATERIAL SPECS")
+    mat_limit = st.sidebar.number_input("Melt Limit (K)", value=2500.0, step=50.0)
+    k_mat = st.sidebar.number_input("Thermal Conductivity (W/mK)", value=150.0, step=10.0)
+else:
+    # Material property dictionaries (Melt Temp K, Thermal Conductivity W/mK)
+    materials = {
+        "Silicon": {"melt": 1687.0, "k": 149.0},
+        "Copper": {"melt": 1358.0, "k": 401.0},
+        "Diamond": {"melt": 4300.0, "k": 2200.0},
+        "Hafnium Oxide": {"melt": 3031.0, "k": 23.0}
+    }
+    mat_limit = materials[material]["melt"]
+    k_mat = materials[material]["k"]
 
 # Main UI
 st.title("STALWART REALITY ENGINE")
@@ -42,11 +51,8 @@ st.markdown("---")
 st.markdown("## ⚙️ STALWART COMPUTATION RESULTS")
 
 if st.button("RUN THERMAL SWEEP"):
-    # Simulated 2D Thermal-Scalar Math 
-    # T_core = T_inlet + (Q_flux * Area) / (h * A_surface) + (Q_flux * thickness) / k
-    # Simplified for UI real-time processing
     hydraulic_diameter = (2 * channel_width * channel_depth) / (channel_width + channel_depth)
-    heat_transfer_coeff = (velocity * 1000) + 5000 # Simplified convective h
+    heat_transfer_coeff = (velocity * 1000) + 5000 
     thermal_resistance = 1 / heat_transfer_coeff + (1 / k_mat)
     
     calculated_core_temp = ambient_temp + (power_density * 10000 * thermal_resistance)
@@ -57,13 +63,11 @@ if st.button("RUN THERMAL SWEEP"):
     st.markdown(f"**Calculated Core Temp:** {calculated_core_temp:.2f} K")
     st.markdown(f"**Margin to Meltdown:** {mat_limit - calculated_core_temp:.2f} K")
     
-    # The STALWART Corrective Sweep Logic
+    # STALWART Corrective Sweep Logic
     if calculated_core_temp > mat_limit:
         st.error(f"🚨 CRITICAL FAILURE: Core temp ({calculated_core_temp:.1f} K) exceeds {material} thermal limit ({mat_limit} K). MELTDOWN IMMINENT.")
-        
         st.warning("🔄 INITIATING STALWART CORRECTIVE SWEEP...")
         
-        # Automated sweep to find compliant physics
         safe_velocity = velocity
         safe_temp = calculated_core_temp
         
@@ -77,6 +81,6 @@ if st.button("RUN THERMAL SWEEP"):
         if safe_temp <= mat_limit:
             st.success(f"✅ SOLUTION FOUND: To maintain physical compliance, increase Coolant Velocity to **{safe_velocity:.1f} m/s**. Resulting Core Temp: **{safe_temp:.1f} K**.")
         else:
-            st.error(f"❌ SWEEP FAILED: Maximum flow rate reached. Geometry cannot support {power_density} W/cm² with {material}. Suggest switching to Diamond substrate or decreasing heat load.")
+            st.error(f"❌ SWEEP FAILED: Maximum flow rate reached. Geometry cannot support {power_density} W/cm² with {material}. Suggest switching substrate or decreasing heat load.")
     else:
         st.success("✅ SYSTEM STABLE: Thermal boundaries are within physical compliance.")
