@@ -4,6 +4,9 @@ import numpy as np
 # STALWART Reality Engine: Microchannel CHF Solver
 st.set_page_config(page_title="STALWART CHF Solver", page_icon="maltedlogo.ico", layout="wide")
 
+st.sidebar.markdown("## 📷 OPTICAL INPUT")
+camera_photo = st.sidebar.camera_input("Capture Hardware / Schematics")
+
 st.sidebar.markdown("## 1. THERMAL LOAD DYNAMICS")
 power_density = st.sidebar.number_input("Heat Load (W/cm²)", value=1200.0, step=50.0)
 ambient_temp = st.sidebar.number_input("Coolant Inlet Temp (K)", value=298.0, step=5.0)
@@ -22,10 +25,17 @@ material = st.sidebar.selectbox(
     ["Silicon", "Copper", "Diamond", "Hafnium Oxide", "Custom (Theoretical)"]
 )
 
+custom_equation = ""
 if material == "Custom (Theoretical)":
     st.sidebar.markdown("### 🧪 THEORETICAL MATERIAL SPECS")
     mat_limit = st.sidebar.number_input("Melt Limit (K)", value=2500.0, step=50.0)
     k_mat = st.sidebar.number_input("Thermal Conductivity (W/mK)", value=150.0, step=10.0)
+    
+    st.sidebar.markdown("### 🧬 CUSTOM PHYSICS PARSER")
+    custom_equation = st.sidebar.text_area(
+        "Input Complex Setup (Equations, Nested Pipes, Fluid Types):", 
+        value="e.g., Water @ 300K inside 5mm concentric Ti pipe..."
+    )
 else:
     # Material property dictionaries (Melt Temp K, Thermal Conductivity W/mK)
     materials = {
@@ -41,6 +51,9 @@ else:
 st.title("STALWART REALITY ENGINE")
 st.markdown("### THREAT LEVEL: ZERO. MATH IS TRUTH.")
 st.markdown("#### ACTIVE TELEMETRY: 2D FINITE-DIFFERENCE THERMAL-SCALAR SOLVER")
+
+if camera_photo:
+    st.success("✅ Optical data captured and stored in local memory cache.")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("INPUT HEAT LOAD", f"{power_density} W/cm²")
@@ -59,6 +72,9 @@ if st.button("RUN THERMAL SWEEP"):
     
     st.markdown("*Executed Physics Equations:*")
     st.latex(r"T_{core} = T_{inlet} + q'' \left( \frac{1}{h} + \frac{t}{k} \right)")
+    
+    if custom_equation and custom_equation != "e.g., Water @ 300K inside 5mm concentric Ti pipe...":
+        st.info(f"**Custom Physics Input Registered:** `{custom_equation}` *(Awaiting advanced CoolProp/SymPy integration for next-gen nested calculations)*")
     
     st.markdown(f"**Calculated Core Temp:** {calculated_core_temp:.2f} K")
     st.markdown(f"**Margin to Meltdown:** {mat_limit - calculated_core_temp:.2f} K")
