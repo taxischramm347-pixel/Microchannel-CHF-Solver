@@ -1,8 +1,19 @@
 import streamlit as st
 import numpy as np
+import google.generativeai as genai
+from PIL import Image
+import json
 
 # STALWART Reality Engine: Microchannel CHF Solver
 st.set_page_config(page_title="STALWART CHF Solver", page_icon="maltedlogo.ico", layout="wide")
+
+# Initialize session state for AI auto-fill
+if 'power_density' not in st.session_state: st.session_state['power_density'] = 1200.0
+if 'ambient_temp' not in st.session_state: st.session_state['ambient_temp'] = 298.0
+if 'channel_width' not in st.session_state: st.session_state['channel_width'] = 50.0
+if 'channel_depth' not in st.session_state: st.session_state['channel_depth'] = 150.0
+if 'fin_pitch' not in st.session_state: st.session_state['fin_pitch'] = 100.0
+if 'velocity' not in st.session_state: st.session_state['velocity'] = 2.0
 
 st.sidebar.markdown("## 📷 OPTICAL INPUT (BYOK)")
 enable_camera = st.sidebar.toggle("Enable Optical Sensor")
@@ -14,20 +25,57 @@ if enable_camera:
 user_api_key = st.sidebar.text_input(
     "Google Gemini API Key (BYOK)", 
     type="password", 
-    help="Bring Your Own Key: Enter your personal API key to parse optical sketches via Vision AI. You cover your own compute costs."
+    help="Bring Your Own Key: Enter your personal API key to parse optical sketches via Vision AI."
 )
 
+if camera_photo and user_api_key:
+    if st.sidebar.button("🧠 PROCESS OPTICAL DATA"):
+        with st.spinner('Vision Module Parsing...'):
+            try:
+                genai.configure(api_key=user_api_key)
+                # Using 1.5 Flash for rapid multimodal processing
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                img = Image.open(camera_photo)
+                
+                prompt = """
+                Analyze this schematic or handwritten note. Extract numerical values for: 
+                "power_density" (Heat Load W/cm²), "ambient_temp" (Inlet Temp K), "channel_width" (μm), 
+                "channel_depth" (μm), "fin_pitch" (μm), "velocity" (Coolant Velocity m/s). 
+                Return ONLY a JSON object with these exact keys, using null if a value is missing. 
+                Example: {"power_density": 50.0, "velocity": 10.0}
+                """
+                
+                response = model.generate_content([prompt, img])
+                
+                # Clean up response to ensure valid JSON
+                clean_text = response.text.replace('```json', '').replace('```', '').strip()
+                data = json.loads(clean_text)
+                
+                # Inject extracted data directly into the UI state
+                if data.get('power_density'): st.session_state['power_density'] = float(data['power_density'])
+                if data.get('ambient_temp'): st.session_state['ambient_temp'] = float(data['ambient_temp'])
+                if data.get('channel_width'): st.session_state['channel_width'] = float(data['channel_width'])
+                if data.get('channel_depth'): st.session_state['channel_depth'] = float(data['channel_depth'])
+                if data.get('fin_pitch'): st.session_state['fin_pitch'] = float(data['fin_pitch'])
+                if data.get('velocity'): st.session_state['velocity'] = float(data['velocity'])
+                
+                st.sidebar.success("✅ Optical data parsed! Inputs updated.")
+                st.rerun() # Refresh the page to show the new numbers
+                
+            except Exception as e:
+                st.sidebar.error(f"❌ Vision parsing failed. Ensure your API key is valid. Error: {e}")
+
 st.sidebar.markdown("## 1. THERMAL LOAD DYNAMICS")
-power_density = st.sidebar.number_input("Heat Load (W/cm²)", value=1200.0, step=50.0)
-ambient_temp = st.sidebar.number_input("Coolant Inlet Temp (K)", value=298.0, step=5.0)
+power_density = st.sidebar.number_input("Heat Load (W/cm²)", key="power_density", step=50.0)
+ambient_temp = st.sidebar.number_input("Coolant Inlet Temp (K)", key="ambient_temp", step=5.0)
 
 st.sidebar.markdown("## 2. MICROCHANNEL GEOMETRY")
-channel_width = st.sidebar.number_input("Channel Width (μm)", value=50.0, step=5.0)
-channel_depth = st.sidebar.number_input("Channel Depth (μm)", value=150.0, step=10.0)
-fin_pitch = st.sidebar.number_input("Fin Pitch (μm)", value=100.0, step=10.0)
+channel_width = st.sidebar.number_input("Channel Width (μm)", key="channel_width", step=5.0)
+channel_depth = st.sidebar.number_input("Channel Depth (μm)", key="channel_depth", step=10.0)
+fin_pitch = st.sidebar.number_input("Fin Pitch (μm)", key="fin_pitch", step=10.0)
 
 st.sidebar.markdown("## 3. FLUID & MATERIAL PARAMS")
-velocity = st.sidebar.number_input("Initial Coolant Velocity (m/s)", value=2.0, step=0.5)
+velocity = st.sidebar.number_input("Initial Coolant Velocity (m/s)", key="velocity", step=0.5)
 
 # Dynamic Material Selection with Theoretical Input
 material = st.sidebar.selectbox(
@@ -47,7 +95,6 @@ if material == "Custom (Theoretical)":
         value="e.g., Water @ 300K inside 5mm concentric Ti pipe..."
     )
 else:
-    # Material property dictionaries (Melt Temp K, Thermal Conductivity W/mK)
     materials = {
         "Silicon": {"melt": 1687.0, "k": 149.0},
         "Copper": {"melt": 1358.0, "k": 401.0},
@@ -61,12 +108,6 @@ else:
 st.title("STALWART REALITY ENGINE")
 st.markdown("### THREAT LEVEL: ZERO. MATH IS TRUTH.")
 st.markdown("#### ACTIVE TELEMETRY: 2D FINITE-DIFFERENCE THERMAL-SCALAR SOLVER")
-
-if camera_photo:
-    if user_api_key:
-        st.success("✅ Optical data captured. API Key recognized. (Vision Parsing Module standing by for integration).")
-    else:
-        st.warning("⚠️ Optical data captured, but no API Key detected. Please enter your BYOK to enable Vision Parsing.")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("INPUT HEAT LOAD", f"{power_density} W/cm²")
